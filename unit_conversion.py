@@ -1,26 +1,9 @@
 import pandas as pd
-import spacy
-import pt_core_news_sm
+# import spacy
+# import pt_core_news_sm
 import re
 import pandas as pd
 import unicodedata
-
-nlp = spacy.load('pt_core_news_sm')
-
-def convert_vulgar_fraction(text):
-    text = list(text)
-    fractions = [(i, unicodedata.normalize("NFKC", char)) for i, char in enumerate(text) if 'VULGAR FRACTION' in unicodedata.name(char)]
-    if len(fractions) > 0:
-        for pos, normalized_fraction in fractions:
-            text[pos] = normalized_fraction
-    return ''.join(text)
-
-recipes_df = pd.read_json('panelinha_dessert_recipes.json')
-recipes_df = recipes_df.drop_duplicates(subset=['name', 'link'], keep='first', ignore_index=True)
-
-ingredients_df = recipes_df[['name', 'ingredients']].copy()
-ingredients_df = ingredients_df.explode('ingredients').explode('ingredients')
-ingredients_df['ingredients_fractional'] = ingredients_df['ingredients'].apply(lambda x: convert_vulgar_fraction(x))
 
 standard_measures = 'grama|gramas|kg|g|ml|l|oz|lbs|mg'
 household_measures = 'xícaras|xícara|colheres|colher|copos|copo|pitadas|pitada|pacotes|pacote|envelopes|envelope|unidades|unidade|latas|lata|pedaços|pedaço|fatias|fatia|tbsp|tsp|cups|cup|caixas|caixa'
@@ -62,9 +45,26 @@ def create_entities(text):
     entities['entities'].sort(key=lambda x: x[0])
     return entities
 
+def convert_vulgar_fraction(text):
+    text = list(text)
+    fractions = [(i, unicodedata.normalize("NFKC", char)) for i, char in enumerate(text) if 'VULGAR FRACTION' in unicodedata.name(char)]
+    if len(fractions) > 0:
+        for pos, normalized_fraction in fractions:
+            text[pos] = normalized_fraction
+    return ''.join(text)
+
+recipes_df = pd.read_json('panelinha_dessert_recipes.json')
+recipes_df = recipes_df.drop_duplicates(subset=['name', 'link'], keep='first', ignore_index=True)
+
+ingredients_df = recipes_df[['name', 'ingredients']].copy()
+ingredients_df = ingredients_df.explode('ingredients').explode('ingredients')
+
+ingredients_df['ingredients_fractional'] = ingredients_df['ingredients'].apply(lambda x: convert_vulgar_fraction(x))
 ingredients_df['entities'] = ingredients_df['ingredients_fractional'].apply(create_entities)
 
 print(ingredients_df.info())
+
+# nlp = spacy.load('pt_core_news_sm')
 #Unidades de medida padrão
 
 #medida/grandeza de massa: Kg
