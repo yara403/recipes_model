@@ -1,13 +1,11 @@
 import pandas as pd
-# import spacy
-# import pt_core_news_sm
 import re
 import pandas as pd
 import unicodedata
 
 standard_measures = 'grama|gramas|kg|g|litros|litro|ml|l|oz|lbs|mg'
-household_measures = 'xícaras|xícara|colheres|colher|copos|copo|potes|pote|pitadas|pitada|pacotes|pacote|envelopes|envelope|unidades|unidade|latas|lata|pedaços|pedaço|fatias|fatia|tabletes|tablete|saquinhos|saquinho|tbsp|tsp|cups|cup|caixas|caixa|bolas|bola'
-informal_measures = 'dúzias|dúzia|pencas|penca|espigas|espiga|bagas|baga|gotas|gota|ramas|rama|ramos|ramo|cachos|cacho|metades|metade|cavidades|cavidade'
+household_measures = 'xícaras|xícara|colheres|colher|copos|copo|potes|pote|pitadas|pitada|pacotes|pacote|envelopes|envelope|unidades|unidade|latas|lata|fatias|fatia|tabletes|tablete|saquinhos|saquinho|tbsp|tsp|cups|cup|caixas|caixa|bolas|bola'
+informal_measures = 'dúzias|dúzia|pencas|penca|dentes|dente|espigas|espiga|bagas|baga|gotas|gota|ramas|rama|ramos|ramo|cachos|cacho|metades|metade|cavidades|cavidade|pedaços|pedaço'
 
 quantity_regex = '(?P<quantity>(\d+\s+\d+\N{FRACTION SLASH}\d+|\d+\N{FRACTION SLASH}\d+|\d+(?!\s+\d+))(\.\d+|\,\d+)?)'
 
@@ -108,24 +106,32 @@ def clean_ingredient_description(description):
     
     return description
 
+from enum import Enum
+class Entity(Enum):
+    STANDARD = 'MEDIDA_PADRAO'
+    HOUSEHOLD = 'MEDIDA_CASEIRA'
+    INFORMAL = 'MEDIDA_INFORMAL'
+    UNIT = 'UNIDADE'
+    FOOD = 'ALIMENTO'
+
 def create_entities(text):
     entities = {'entities': []}
 
     standard_matches = standard_measure_pattern.finditer(text)
     for match in standard_matches:
-        entities['entities'].append((match.start('quantity'), match.end('measure'), 'MEDIDA_PADRAO'))
+        entities['entities'].append((match.start('quantity'), match.end('measure'), Entity.STANDARD.value))
 
     household_matches = household_measure_pattern.finditer(text)
     for match in household_matches:
-        entities['entities'].append((match.start('quantity'), match.end('measure'), 'MEDIDA_CASEIRA'))
+        entities['entities'].append((match.start('quantity'), match.end('measure'), Entity.HOUSEHOLD.value))
 
     informal_matches = informal_measure_pattern.finditer(text)
     for match in informal_matches:
-        entities['entities'].append((match.start('quantity'), match.end('measure'), 'MEDIDA_INFORMAL'))
+        entities['entities'].append((match.start('quantity'), match.end('measure'), Entity.INFORMAL.value))
 
     unit_matches = unit_pattern.finditer(text)
     for match in unit_matches:
-        entities['entities'].append((match.start('quantity'), match.end('quantity'), 'UNIDADE'))
+        entities['entities'].append((match.start('quantity'), match.end('quantity'), Entity.UNIT.value))
 
     ingredient = clean_ingredient_description(text)
     ingredient_only = ''
@@ -134,28 +140,31 @@ def create_entities(text):
         for item in part:
             item_part_match = re.search(re.escape(item), text)
             if item_part_match:
-                entities['entities'].append((item_part_match.start(), item_part_match.end(), 'ALIMENTO'))
+                entities['entities'].append((item_part_match.start(), item_part_match.end(), Entity.FOOD.value))
                 ingredient_only += item + " "        
 
     entities['entities'].sort(key=lambda x: x[0])
     return entities, ingredient_only.strip()
 
-recipes_df = pd.read_json('panelinha_dessert_recipes.json')
-recipes_df = recipes_df.drop_duplicates(subset=['name', 'link'], keep='first', ignore_index=True)
+def get_ingredient_entities_df():
+    recipes_df = pd.read_json('panelinha_dessert_recipes.json')
+    recipes_df = recipes_df.drop_duplicates(subset=['name', 'link'], keep='first', ignore_index=True)
 
-ingredients_df = recipes_df[['name', 'ingredients']].copy()
-ingredients_df = ingredients_df.explode('ingredients').explode('ingredients')
+    ingredients_df = recipes_df[['name', 'ingredients']].copy()
+    ingredients_df = ingredients_df.explode('ingredients').explode('ingredients')
 
-ingredients_df['ingredients_fractional'] = ingredients_df['ingredients'].apply(lambda x: convert_vulgar_fraction(x))
-ingredients_df['entity_food'] = ingredients_df['ingredients_fractional'].map(create_entities)
-ingredients_df['entity'] = ingredients_df['entity_food'].map(lambda entity_food: entity_food[0])
-ingredients_df['food'] = ingredients_df['entity_food'].map(lambda entity_food: entity_food[1])
-ingredients_df.drop(columns=['entity_food'], inplace=True)
+    ingredients_df['ingredients_fractional'] = ingredients_df['ingredients'].apply(lambda x: convert_vulgar_fraction(x))
+    ingredients_df['entity_food'] = ingredients_df['ingredients_fractional'].map(create_entities)
+    ingredients_df['entity'] = ingredients_df['entity_food'].map(lambda entity_food: entity_food[0])
+    ingredients_df['food'] = ingredients_df['entity_food'].map(lambda entity_food: entity_food[1])
+    ingredients_df.drop(columns=['entity_food'], inplace=True)
+    ingredients_df = fix_outliers(ingredients_df)
+    return ingredients_df
 
-def specific_corrections():
-    ingredients_df.loc[ingredients_df['ingredients_fractional'] == '1 panetone caseiro de 500 g', 'entity'] = ingredients_df[ingredients_df['ingredients_fractional'] == '1 panetone caseiro de 500 g'].entity.map(lambda x: x['entities'][:-1])
+def fix_outliers(ingredients_df):
+    ingredients_df.loc[ingredients_df['ingredients_fractional'] == '1 panetone caseiro de 500 g', 'entity'] = ingredients_df[ingredients_df['ingredients_fractional'] == '1 panetone caseiro de 500 g'].entity.map(lambda x: {'entities': x['entities'][:-1]})
     ingredients_df.loc[ingredients_df['ingredients_fractional'] == '2 tiras finas da casca de limão', ['entity', 'food']] = {'entities': [(0, 1, 'UNIDADE'), (17, 31, 'ALIMENTO')]}, 'casca de limão'
-    ingredients_df.loc[ingredients_df['ingredients'] == '¼ de xícara (chá) de banana-passa cortada em rodelas 1 cm', 'entity']  = ingredients_df[ingredients_df['ingredients'] == '¼ de xícara (chá) de banana-passa cortada em rodelas 1 cm'].entity.map(lambda x: x['entities'][:-1])
+    ingredients_df.loc[ingredients_df['ingredients'] == '¼ de xícara (chá) de banana-passa cortada em rodelas 1 cm', 'entity']  = ingredients_df[ingredients_df['ingredients'] == '¼ de xícara (chá) de banana-passa cortada em rodelas 1 cm'].entity.map(lambda x: {'entities': x['entities'][:-1]})
     ingredients_df.loc[(ingredients_df['name'] == 'Ovinhos pintados') & (ingredients_df['food'] == 'ovos brancos'), ['entity', 'food']] = {'entities': [(0, 1, 'UNIDADE')]}, ''
     ingredients_df.loc[(ingredients_df['name'] == 'Ovinhos de chocolate') & (ingredients_df['food'] == 'ovos brancos'), ['entity', 'food']] = {'entities': [(0, 1, 'UNIDADE')]}, ''
     ingredients_df.loc[ingredients_df['ingredients'] == '6 folhas bem bonitas de rosa', ['entity', 'food']] = {'entities': [(0, 1, 'UNIDADE'), (2, 8, 'ALIMENTO'), (21, 28, 'ALIMENTO')]}, 'folhas de rosa'
@@ -167,19 +176,19 @@ def specific_corrections():
     ingredients_df.loc[ingredients_df['ingredients'] == '⅓ de xícara (chá) de castanha-de-caju torrada, sem sal', ['entity', 'food']] = {'entities': [(0, 19, 'MEDIDA_CASEIRA'), (23, 56, 'ALIMENTO')]}, 'castanha-de-caju torrada, sem sal'
     ingredients_df.loc[ingredients_df['ingredients'] == '2½ colheres (sopa) de óleo (ou manteiga derretida)', ['entity', 'food']] = {'entities': [(0, 20, 'MEDIDA_CASEIRA'), (24, 28, 'ALIMENTO'), (33, 41, 'ALIMENTO')]}, 'óleo manteiga'
     ingredients_df.loc[ingredients_df['ingredients'] == 'óleo (ou manteiga) para untar a frigideira', ['entity', 'food']] = {'entities': [(0, 4, 'ALIMENTO'), (9, 17, 'ALIMENTO')]}, 'óleo manteiga'
-    ingredients_df[ingredients_df['ingredients'] == '2½ xícaras (chá) de frutas vermelhas congeladas (cerca de 350g de morango, framboesa e amora)']
     ingredients_df.loc[ingredients_df['ingredients'] == '1½ xícara (chá) de frutas variadas picadas (melão, morango, kiwi...)', ['entity', 'food']] = {'entities': [(0, 17, 'MEDIDA_CASEIRA'), (21, 27, 'ALIMENTO'), (46, 51, 'ALIMENTO'), (53, 60, 'ALIMENTO'), (62, 66, 'ALIMENTO')]}, 'frutas melão morango kiwi'
     ingredients_df.loc[ingredients_df['ingredients'] == '1 colher (chá) de raspas de laranja ou de limão', ['entity', 'food']] = {'entities': [(0, 14, 'MEDIDA_CASEIRA'), (18, 35, 'ALIMENTO'), (42, 47, 'ALIMENTO')]}, 'raspas de laranja limão'
     ingredients_df.loc[ingredients_df['ingredients'] == '½ xícara (chá) de vinho tinto (ou 1 xícara (chá) de vinho Marsala)', ['entity', 'food']] = {'entities': [(0, 16, 'MEDIDA_CASEIRA'), (20, 31, 'ALIMENTO'), (36, 50, 'MEDIDA_CASEIRA'), (54, 67, 'ALIMENTO')]}, 'vinho tinto vinho Marsala'
     ingredients_df.loc[ingredients_df['ingredients'] == '2½ xícaras (chá) de fruta vermelha (morango, framboesa e amora - cerca de 350 g)', ['entity', 'food']] = {'entities': [(0, 18, 'MEDIDA_CASEIRA'), (22, 36, 'ALIMENTO'), (38, 45, 'ALIMENTO'), (47, 56, 'ALIMENTO'), (59, 64, 'ALIMENTO'), (76, 81, 'MEDIDA_PADRAO')]}, 'fruta vermelha morango framboesa amora'
     ingredients_df.loc[ingredients_df['ingredients'] == 'óleo (ou manteiga) para untar a assadeira', ['entity', 'food']] = {'entities': [(0, 4, 'ALIMENTO'), (9, 17, 'ALIMENTO')]}, 'óleo manteiga'
     ingredients_df.loc[ingredients_df['ingredients'] == '¼ de xícara (chá) de café coado, água ou o licor de sua preferência', ['entity', 'food']] = {'entities': [(0, 19, 'MEDIDA_CASEIRA'), (23, 27, 'ALIMENTO'), (35, 39, 'ALIMENTO'), (45, 50, 'ALIMENTO')]}, 'café água licor'
+    ingredients_df.loc[ingredients_df['ingredients'] == '1 xícara (chá) de gotas de chocolate ou chocolate cortado em cubinhos (cerca de 150 g)', ['entity', 'food']] = {'entities': [(0, 14, 'MEDIDA_CASEIRA'), (18, 36, 'ALIMENTO'), (40, 49, 'ALIMENTO'), (80, 85, 'MEDIDA_PADRAO')]}, 'gotas de chocolate chocolate'
+    ingredients_df.loc[ingredients_df['ingredients'] == '2½ xícaras (chá) de frutas vermelhas congeladas (cerca de 350g de morango, framboesa e amora)', ['entity', 'food']] = {'entities': [(0, 18, 'MEDIDA_CASEIRA'), (22, 38, 'ALIMENTO'), (60, 64, 'MEDIDA_PADRAO'), (68, 75, 'ALIMENTO'), (77, 86, 'ALIMENTO'), (89, 94, 'ALIMENTO')]}, 'frutas vermelhas morango framboesa amora'
+    ingredients_df.loc[ingredients_df['ingredients'].str.contains(fr'\b{quantity_regex}\s+carambola\b'), ['entity', 'food']] = {'entities': [(0, 1, 'UNIDADE'), (2, 11, 'ALIMENTO')]}, 'carambola'
+    ingredients_df.loc[ingredients_df['ingredients'].str.contains(fr'\b{quantity_regex}\s+carambolas'), ['entity', 'food']] = {'entities': [(0, 1, 'UNIDADE'), (2, 12, 'ALIMENTO')]}, 'carambolas'    
+    
+    return ingredients_df
 
-specific_corrections()
-print(ingredients_df[ingredients_df['ingredients'] == '¼ de xícara (chá) de café coado, água ou o licor de sua preferência'])
-print(ingredients_df.info())
-
-# nlp = spacy.load('pt_core_news_sm')
 #Unidades de medida padrão
 
 #medida/grandeza de massa: Kg
