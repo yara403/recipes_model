@@ -149,6 +149,7 @@ def create_entities(text):
 def get_ingredient_entities_df():
     recipes_df = pd.read_json('panelinha_dessert_recipes.json')
     recipes_df = recipes_df.drop_duplicates(subset=['name', 'link'], keep='first', ignore_index=True)
+    recipes_df.to_json('panelinha_dessert_recipes_cleaned.json', orient='records', indent=4)
 
     ingredients_df = recipes_df[['name', 'ingredients']].copy()
     ingredients_df = ingredients_df.explode('ingredients').explode('ingredients')
