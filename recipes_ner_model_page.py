@@ -87,5 +87,5 @@ if total_steps_selected:
         recipes_raw_df['total_steps'].isin(total_steps_selected)
         ]
 
-st.subheader(f"{len(recipes_selected)} receitas:", divider=True, icon="👩‍🍳")
+st.subheader(f"{len(recipes_selected)} receitas:", divider="gray", icon="👩‍🍳")
 st.dataframe(recipes_selected, hide_index=True)
