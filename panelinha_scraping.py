@@ -3,7 +3,9 @@ from bs4 import BeautifulSoup
 import re
 import json
 
-base_url = 'https://panelinha.com.br/categoria/doces'
+BASE_URL = 'https://panelinha.com.br/categoria/doces'
+RECIPES_JSON_PATH = 'panelinha_dessert_recipes.json'
+CLEANED_RECIPES_JSON_PATH = 'panelinha_dessert_recipes_cleaned.json'
 
 def get_html(url):
     response = requests.get(url)
@@ -13,7 +15,7 @@ def get_html(url):
     return BeautifulSoup(html, 'html.parser')
 
 def get_number_of_pages():
-    main_page = get_html(base_url)
+    main_page = get_html(BASE_URL)
     pagination_links = main_page.find_all('a', class_='ais-Pagination-link')
     last_page_link = pagination_links.pop().get('href')
     number_of_pages = int(last_page_link.split('/').pop())
@@ -22,11 +24,11 @@ def get_number_of_pages():
 def get_all_recipes() -> list:
     recipe_list = []
     for i in range(get_number_of_pages()):
-        url = base_url+f'/pagina/{i+1}'
+        url = BASE_URL+f'/pagina/{i+1}'
         html_page = get_html(url)
         recipes = html_page.find_all('div', class_='f fc mod')
         for recipe in recipes:
-            link = requests.compat.urljoin(base_url, recipe.find('a').get('href'))
+            link = requests.compat.urljoin(BASE_URL, recipe.find('a').get('href'))
             full_recipe = {
                 'name': str(recipe.find('h6').text.strip()),
                 'category': 'doces',
@@ -75,6 +77,10 @@ def get_steps(recipe_page) -> list:
         
     return steps
 
-recipes = get_all_recipes()
-with open('panelinha_dessert_recipes.json', 'w', encoding='utf-8') as f:
-    f.write(json.dumps(recipes, indent=2))
+def main():
+    recipes = get_all_recipes()
+    with open(RECIPES_JSON_PATH, 'w', encoding='utf-8') as f:
+        f.write(json.dumps(recipes, indent=2))
+
+if __name__ == "__main__":
+    main()

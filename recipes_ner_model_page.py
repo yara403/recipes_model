@@ -4,6 +4,8 @@ from spacy_streamlit import visualize_ner
 import pandas as pd
 from pathlib import Path
 import re
+import unicodedata
+from panelinha_scraping import CLEANED_RECIPES_JSON_PATH as RECIPES_PATH
 import recipes_ner_model
 
 st.set_page_config(
@@ -38,6 +40,7 @@ with st.form(key='ner_form', enter_to_submit=False):
     bt_clicked = st.form_submit_button('Enviar')
 
 if text and bt_clicked:
+    text = unicodedata.normalize('NFKC', text)
     doc = recipes_ner_model(text)
     visualize_ner(
         doc, 
@@ -47,12 +50,11 @@ if text and bt_clicked:
         )
 
 st.subheader("Explore mais o nosso banco de dados de receitas:", icon="🍲")
-
-recipes_raw_df = pd.read_json('panelinha_dessert_recipes_cleaned.json')
+recipes_raw_df = pd.read_json(RECIPES_PATH)
 
 def ingredient_search():
     recipes_selected_df = recipes_raw_df[['name', 'description', 'time', 'serves','ingredients', 'steps', 'link']]
-    search_term = st.text_input('Pesquisar por ingrediente:', type='search', live=True, placeholder='Buscar', icon='🍊')
+    search_term = st.text_input('Pesquisar por ingrediente:', type='search', live=True, placeholder='Buscar receitas por ingrediente', icon='🍊')
     if search_term:
         recipes_selected_df = recipes_selected_df[
             recipes_selected_df['ingredients']

@@ -2,6 +2,16 @@ import pandas as pd
 import re
 import pandas as pd
 import unicodedata
+from pathlib import Path
+import panelinha_scraping
+
+from enum import Enum
+class Entity(Enum):
+    STANDARD = 'MEDIDA_PADRAO'
+    HOUSEHOLD = 'MEDIDA_CASEIRA'
+    INFORMAL = 'MEDIDA_INFORMAL'
+    UNIT = 'UNIDADE'
+    FOOD = 'ALIMENTO'
 
 standard_measures = 'grama|gramas|kg|g|litros|litro|ml|l|oz|lbs|mg'
 household_measures = 'xícaras|xícara|colheres|colher|copos|copo|potes|pote|pitadas|pitada|pacotes|pacote|envelopes|envelope|unidades|unidade|latas|lata|fatias|fatia|tabletes|tablete|saquinhos|saquinho|tbsp|tsp|cups|cup|caixas|caixa|bolas|bola'
@@ -106,14 +116,6 @@ def clean_ingredient_description(description):
     
     return description
 
-from enum import Enum
-class Entity(Enum):
-    STANDARD = 'MEDIDA_PADRAO'
-    HOUSEHOLD = 'MEDIDA_CASEIRA'
-    INFORMAL = 'MEDIDA_INFORMAL'
-    UNIT = 'UNIDADE'
-    FOOD = 'ALIMENTO'
-
 def create_entities(text):
     entities = {'entities': []}
 
@@ -147,9 +149,13 @@ def create_entities(text):
     return entities, ingredient_only.strip()
 
 def get_ingredient_entities_df():
-    recipes_df = pd.read_json('panelinha_dessert_recipes.json')
+    recipes_path = Path(panelinha_scraping.RECIPES_JSON_PATH)
+    if not recipes_path.exists():
+        panelinha_scraping.main()
+
+    recipes_df = pd.read_json(panelinha_scraping.RECIPES_JSON_PATH)
     recipes_df = recipes_df.drop_duplicates(subset=['name', 'link'], keep='first', ignore_index=True)
-    recipes_df.to_json('panelinha_dessert_recipes_cleaned.json', orient='records', indent=4)
+    recipes_df.to_json(panelinha_scraping.CLEANED_RECIPES_JSON_PATH, orient='records', indent=4)
 
     ingredients_df = recipes_df[['name', 'ingredients']].copy()
     ingredients_df = ingredients_df.explode('ingredients').explode('ingredients')
