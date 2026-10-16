@@ -8,8 +8,16 @@ A segunda parte, composta por um modelo de Reconhecimento de Entidades Nomeadas 
 
 O banco de dados e a identificação de entidades pode ser acessada através da página [recipesmodel.streamlit.app](https://recipesmodel.streamlit.app). Teste e depois me conte sobre sua experiência/dúvidas, caso tenha interesse.
 
-<img width="300" height="525" alt="modelrecipes-page_mobile" src="https://github.com/user-attachments/assets/0d180ce5-02c4-41fc-86b4-6083e141ce50" />
-<img width="683" height="384" alt="modelrecipes-page_site" src="https://github.com/user-attachments/assets/92cdafe9-041b-46fa-be54-793d3737856e" />
+<table>
+  <tr>
+    <td>
+      <img width="300" height="525" alt="modelrecipes-page_mobile" src="https://github.com/user-attachments/assets/0d180ce5-02c4-41fc-86b4-6083e141ce50" />
+    </td>
+    <td>
+      <img width="683" height="384" alt="modelrecipes-page_site" src="https://github.com/user-attachments/assets/92cdafe9-041b-46fa-be54-793d3737856e" />
+    </td>
+  </tr>
+</table>
 
 ***
 
