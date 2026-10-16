@@ -7,6 +7,7 @@ Um web scraping, implementado com a biblioteca BeautifulSoup, integra a primeira
 A segunda parte, composta por um modelo de Reconhecimento de Entidades Nomeadas (NER), identifica alimentos e medidas de peso/volume comuns nas descrições de receitas culinárias. Reconhecer estas entidades é imprescindível ao cálculo da composição nutricional das receitas.
 
 O banco de dados e a identificação de entidades pode ser acessada através da página [recipesmodel.streamlit.app](https://recipesmodel.streamlit.app). Teste e depois me conte sobre sua experiência/dúvidas, caso tenha interesse.
+
 <img width="300" height="525" alt="modelrecipes-page_mobile" src="https://github.com/user-attachments/assets/0d180ce5-02c4-41fc-86b4-6083e141ce50" />
 
 ***
